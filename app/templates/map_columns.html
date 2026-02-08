@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kolon Eşleştir</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <div class="brand">
+        <div class="logo">AK</div>
+        <div>
+          <h1>Kolon Eşleştir</h1>
+          <p>Dosyanızdaki kolonları sistemin beklediği alanlarla eşleştirin.</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a class="btn secondary" href="/">Geri</a>
+      </div>
+    </header>
+
+    <main class="card">
+      <h2>Eşleştirme</h2>
+      <p class="muted">Zorunlu alanlar: <b>Başlık</b> ve <b>Görsel</b>. (Seçmeseniz de analiz çalışır ama daha zayıf olur.)</p>
+
+      <form class="form" action="/analyze_mapped" method="post">
+        <input type="hidden" name="upload_id" value="{{ upload_id }}" />
+
+        <label>
+          <div class="help-title">Başlık kolonu (title)</div>
+          <select name="title_col" class="select">
+            {% for o in options %}
+              <option value="{{ o }}">{{ "Seçilmedi" if o=="__none__" else o }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          <div class="help-title">Görsel URL/Path kolonu (image_url)</div>
+          <select name="image_col" class="select">
+            {% for o in options %}
+              <option value="{{ o }}">{{ "Seçilmedi" if o=="__none__" else o }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          <div class="help-title">Kategori kolonu (category) — opsiyonel</div>
+          <select name="category_col" class="select">
+            {% for o in options %}
+              <option value="{{ o }}">{{ "Seçilmedi" if o=="__none__" else o }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          <div class="help-title">Alt kategori kolonu (sub_category) — opsiyonel</div>
+          <select name="sub_category_col" class="select">
+            {% for o in options %}
+              <option value="{{ o }}">{{ "Seçilmedi" if o=="__none__" else o }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <button class="btn" type="submit">Analizi Başlat</button>
+      </form>
+
+      <div class="help" style="margin-top:16px;">
+        <div class="help-item">
+          <div class="help-title">Dosyadaki kolonlar</div>
+          <div class="help-text">
+            {% for c in all_columns %}
+              <code>{{ c }}</code>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        <div class="help-item">
+          <div class="help-title">İpucu</div>
+          <div class="help-text">Başlık ve görsel eşleştirirsen skor ve öneriler daha anlamlı olur.</div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer"><span>© Akıllı Katalog</span></footer>
+  </div>
+</body>
+</html>

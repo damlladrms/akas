@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Analiz Sonuçları</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="page">
+
+    <header class="header">
+      <div class="brand">
+        <div class="logo">AKAS</div>
+        <div>
+          <h1>Analiz Sonuçları</h1>
+          <p>
+            Otomatik kalite denetimi tamamlandı.
+            Aşağıda özet ve detayları görebilirsiniz.
+          </p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <a class="btn secondary" href="/">Yeni Analiz</a>
+        <a class="btn" href="/download/{{ job_id }}">Excel İndir</a>
+      </div>
+    </header>
+
+    <main class="card">
+
+      <!-- ÖZET KARTLAR -->
+      <div class="help" style="margin-bottom:16px;">
+        <div class="help-item">
+          <div class="help-title">Toplam Kayıt</div>
+          <div class="help-text"><b>{{ summary.row_count }}</b></div>
+        </div>
+        <div class="help-item">
+          <div class="help-title">Şüpheli Başlık</div>
+          <div class="help-text"><b>{{ summary.spelling_cnt }}</b></div>
+        </div>
+        <div class="help-item">
+          <div class="help-title">Görsel Eksik</div>
+          <div class="help-text"><b>{{ summary.image_missing_cnt }}</b></div>
+        </div>
+        <div class="help-item">
+          <div class="help-title">Ortalama Skor</div>
+          <div class="help-text"><b>{{ summary.avg_score }}</b></div>
+        </div>
+      </div>
+
+      <h2>Detaylı Sonuçlar (İlk 200 Kayıt)</h2>
+      <p class="muted">
+        Aşağıdaki tablo analiz edilen verinin önizlemesini gösterir.
+        Tüm sonuçları Excel olarak indirebilirsiniz.
+      </p>
+
+      <div class="tablewrap">
+        <table class="table">
+          <thead>
+            <tr>
+              {% for c in columns %}
+                <th>{{ c }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              <tr>
+                {% for c in columns %}
+                  <td>{{ r[c] }}</td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </main>
+
+    <footer class="footer">
+      <span>© Akıllı Katalog</span>
+    </footer>
+
+  </div>
+</body>
+</html>

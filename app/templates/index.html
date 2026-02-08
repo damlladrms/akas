@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Akıllı Katalog Analiz Sistemi</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="page">
+
+    <header class="header">
+      <div class="brand">
+        <div class="logo">AKAS</div>
+        <div>
+          <h1>Akıllı Katalog Analiz Sistemi</h1>
+          <p>
+            Ürün ve içerik verilerini otomatik analiz ederek
+            hatalı kategori, zayıf başlık, alakasız görsel ve
+            düşük kalite skorlarını tespit eder.
+          </p>
+        </div>
+      </div>
+    </header>
+
+    <main class="card">
+      <h2>Dosya Yükle</h2>
+      <p class="muted">
+        CSV veya Excel (.xlsx) dosyanızı yükleyin.
+        Kolon adları farklıysa sistem sizi yönlendirecektir.
+      </p>
+
+      <form class="form" action="/upload" method="post" enctype="multipart/form-data">
+        <label class="filebox">
+          <input id="file" type="file" name="file" accept=".csv,.xlsx" required />
+          <span class="filebtn">Dosya Seç</span>
+          <span id="filename" class="filename">Henüz dosya seçilmedi</span>
+        </label>
+
+        <button id="submitBtn" class="btn" type="submit">
+          Analizi Başlat
+        </button>
+      </form>
+
+      <div class="help">
+        <div class="help-item">
+          <div class="help-title">Desteklenen Formatlar</div>
+          <div class="help-text">CSV, Excel (.xlsx)</div>
+        </div>
+        <div class="help-item">
+          <div class="help-title">Amaç</div>
+          <div class="help-text">
+            Manuel katalog kalite kontrol yükünü azaltmak
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <span>© Akıllı Katalog</span>
+    </footer>
+
+  </div>
+
+  <script>
+    const fileInput = document.getElementById("file");
+    const filename = document.getElementById("filename");
+    const btn = document.getElementById("submitBtn");
+
+    fileInput.addEventListener("change", () => {
+      filename.textContent =
+        fileInput.files && fileInput.files.length > 0
+          ? fileInput.files[0].name
+          : "Henüz dosya seçilmedi";
+    });
+
+    document.querySelector("form").addEventListener("submit", () => {
+      btn.disabled = true;
+      btn.textContent = "Analiz ediliyor...";
+    });
+  </script>
+</body>
+</html>
