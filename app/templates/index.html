@@ -1,83 +1,81 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Akıllı Katalog Analiz Sistemi</title>
-  <link rel="stylesheet" href="/static/style.css">
+
+  <!-- CSS (cache kırmak için v ekli) -->
+  <link rel="stylesheet" href="/static/style.css?v=7" />
 </head>
+
 <body>
-  <div class="page">
+  <div class="container">
 
-    <header class="header">
-      <div class="brand">
-        <div class="logo">AKAS</div>
-        <div>
-          <h1>Akıllı Katalog Analiz Sistemi</h1>
-          <p>
-            Ürün ve içerik verilerini otomatik analiz ederek
-            hatalı kategori, zayıf başlık, alakasız görsel ve
-            düşük kalite skorlarını tespit eder.
-          </p>
-        </div>
+    <!-- Header -->
+    <div class="topbar">
+      <div class="brand-badge">AKAS</div>
+
+      <div class="hgroup">
+        <h1>Akıllı Katalog Analiz Sistemi</h1>
+        <p>
+          Ürün ve içerik verilerini otomatik analiz ederek hatalı kategori, zayıf başlık, alakasız görsel ve düşük kalite skorlarını tespit eder.
+        </p>
       </div>
-    </header>
+    </div>
 
-    <main class="card">
-      <h2>Dosya Yükle</h2>
-      <p class="muted">
-        CSV veya Excel (.xlsx) dosyanızı yükleyin.
-        Kolon adları farklıysa sistem sizi yönlendirecektir.
+    <!-- Main Card -->
+    <div class="card">
+      <h2 class="card-title">Dosya Yükle</h2>
+      <p class="card-desc">
+        CSV veya Excel (.xlsx) dosyanızı yükleyin. Kolon adları farklıysa sistem sizi “Kolon Eşleştir” ekranına yönlendirecektir.
       </p>
 
-      <form class="form" action="/upload" method="post" enctype="multipart/form-data">
-        <label class="filebox">
-          <input id="file" type="file" name="file" accept=".csv,.xlsx" required />
-          <span class="filebtn">Dosya Seç</span>
-          <span id="filename" class="filename">Henüz dosya seçilmedi</span>
-        </label>
+      <!-- Upload Form -->
+      <form action="/analyze" method="post" enctype="multipart/form-data">
 
-        <button id="submitBtn" class="btn" type="submit">
-          Analizi Başlat
-        </button>
-      </form>
-
-      <div class="help">
-        <div class="help-item">
-          <div class="help-title">Desteklenen Formatlar</div>
-          <div class="help-text">CSV, Excel (.xlsx)</div>
-        </div>
-        <div class="help-item">
-          <div class="help-title">Amaç</div>
-          <div class="help-text">
-            Manuel katalog kalite kontrol yükünü azaltmak
+        <div class="upload-panel">
+          <div class="file-left">
+            <input class="file-input" id="file" type="file" name="file" accept=".csv,.xlsx,.xls" required />
+            <label class="file-btn" for="file">Dosya Seç</label>
+            <span class="file-name" id="fileName">Henüz dosya seçilmedi</span>
           </div>
         </div>
+
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Analizi Başlat</button>
+        </div>
+
+        <div class="help">
+          Desteklenen formatlar: CSV, Excel (.xlsx). Örnek dosya ile denemek için hazırladığınız şablonu yükleyebilirsiniz.
+        </div>
+      </form>
+
+      <!-- Info cards -->
+      <div class="info-grid">
+        <div class="info">
+          <h4>Desteklenen Formatlar</h4>
+          <p>CSV, Excel (.xlsx)</p>
+        </div>
+        <div class="info">
+          <h4>Amaç</h4>
+          <p>Manuel katalog kalite kontrol yükünü azaltmak</p>
+        </div>
       </div>
-    </main>
+    </div>
 
-    <footer class="footer">
-      <span>© Akıllı Katalog</span>
-    </footer>
-
+    <div class="footer">© Akıllı Katalog</div>
   </div>
 
   <script>
     const fileInput = document.getElementById("file");
-    const filename = document.getElementById("filename");
-    const btn = document.getElementById("submitBtn");
+    const fileName = document.getElementById("fileName");
 
-    fileInput.addEventListener("change", () => {
-      filename.textContent =
-        fileInput.files && fileInput.files.length > 0
-          ? fileInput.files[0].name
-          : "Henüz dosya seçilmedi";
-    });
-
-    document.querySelector("form").addEventListener("submit", () => {
-      btn.disabled = true;
-      btn.textContent = "Analiz ediliyor...";
-    });
+    if (fileInput && fileName) {
+      fileInput.addEventListener("change", () => {
+        fileName.textContent = fileInput.files?.[0]?.name || "Henüz dosya seçilmedi";
+      });
+    }
   </script>
 </body>
 </html>
