@@ -4,36 +4,27 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Akıllı Katalog Analiz Sistemi</title>
-
-  <!-- CSS (cache kırmak için v ekli) -->
-  <link rel="stylesheet" href="/static/style.css?v=7" />
+  <link rel="stylesheet" href="/static/style.css?v=101" />
 </head>
-
 <body>
   <div class="container">
-
-    <!-- Header -->
     <div class="topbar">
       <div class="brand-badge">AKAS</div>
-
       <div class="hgroup">
         <h1>Akıllı Katalog Analiz Sistemi</h1>
-        <p>
-          Ürün ve içerik verilerini otomatik analiz ederek hatalı kategori, zayıf başlık, alakasız görsel ve düşük kalite skorlarını tespit eder.
-        </p>
+        <p>Ürün ve içerik verilerini otomatik analiz ederek hatalı kategori, zayıf başlık, alakasız görsel ve düşük kalite skorlarını tespit eder.</p>
       </div>
     </div>
 
-    <!-- Main Card -->
     <div class="card">
       <h2 class="card-title">Dosya Yükle</h2>
-      <p class="card-desc">
-        CSV veya Excel (.xlsx) dosyanızı yükleyin. Kolon adları farklıysa sistem sizi “Kolon Eşleştir” ekranına yönlendirecektir.
-      </p>
+      <p class="card-desc">CSV veya Excel (.xlsx) yükleyin. Kolon adları farklıysa sistem sizi “Kolon Eşleştir” ekranına yönlendirir.</p>
 
-      <!-- Upload Form -->
+      {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+      {% endif %}
+
       <form action="/analyze" method="post" enctype="multipart/form-data">
-
         <div class="upload-panel">
           <div class="file-left">
             <input class="file-input" id="file" type="file" name="file" accept=".csv,.xlsx,.xls" required />
@@ -46,22 +37,8 @@
           <button class="btn btn-primary" type="submit">Analizi Başlat</button>
         </div>
 
-        <div class="help">
-          Desteklenen formatlar: CSV, Excel (.xlsx). Örnek dosya ile denemek için hazırladığınız şablonu yükleyebilirsiniz.
-        </div>
+        <div class="help">Desteklenen formatlar: CSV, Excel (.xlsx). Sonuçlarda “Düzeltilmiş Dosyayı İndir” ile çıktıyı alabilirsiniz.</div>
       </form>
-
-      <!-- Info cards -->
-      <div class="info-grid">
-        <div class="info">
-          <h4>Desteklenen Formatlar</h4>
-          <p>CSV, Excel (.xlsx)</p>
-        </div>
-        <div class="info">
-          <h4>Amaç</h4>
-          <p>Manuel katalog kalite kontrol yükünü azaltmak</p>
-        </div>
-      </div>
     </div>
 
     <div class="footer">© Akıllı Katalog</div>
@@ -70,8 +47,7 @@
   <script>
     const fileInput = document.getElementById("file");
     const fileName = document.getElementById("fileName");
-
-    if (fileInput && fileName) {
+    if (fileInput && fileName){
       fileInput.addEventListener("change", () => {
         fileName.textContent = fileInput.files?.[0]?.name || "Henüz dosya seçilmedi";
       });

@@ -1,87 +1,71 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Analiz Sonuçları</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sonuçlar - AKAS</title>
+  <link rel="stylesheet" href="/static/style.css?v=101" />
 </head>
 <body>
-  <div class="page">
+  <div class="container">
+    <div class="topbar">
+      <div class="brand-badge">AKAS</div>
+      <div class="hgroup">
+        <h1>Analiz Sonuçları</h1>
+        <p>Özet metrikler ve ilk 50 satır önizleme aşağıdadır. Düzeltilmiş dosyayı indirebilirsiniz.</p>
+      </div>
+    </div>
 
-    <header class="header">
-      <div class="brand">
-        <div class="logo">AKAS</div>
-        <div>
-          <h1>Analiz Sonuçları</h1>
-          <p>
-            Otomatik kalite denetimi tamamlandı.
-            Aşağıda özet ve detayları görebilirsiniz.
-          </p>
+    <div class="card">
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">Şüpheli Başlık</div>
+          <div class="kpi-value">{{ summary.suspicious_titles }}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Eksik Görsel</div>
+          <div class="kpi-value">{{ summary.missing_images }}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Ortalama Skor</div>
+          <div class="kpi-value">{{ summary.avg_score }}</div>
         </div>
       </div>
 
-      <div class="header-actions">
-        <a class="btn secondary" href="/">Yeni Analiz</a>
-        <a class="btn" href="/download/{{ job_id }}">Excel İndir</a>
-      </div>
-    </header>
-
-    <main class="card">
-
-      <!-- ÖZET KARTLAR -->
-      <div class="help" style="margin-bottom:16px;">
-        <div class="help-item">
-          <div class="help-title">Toplam Kayıt</div>
-          <div class="help-text"><b>{{ summary.row_count }}</b></div>
-        </div>
-        <div class="help-item">
-          <div class="help-title">Şüpheli Başlık</div>
-          <div class="help-text"><b>{{ summary.spelling_cnt }}</b></div>
-        </div>
-        <div class="help-item">
-          <div class="help-title">Görsel Eksik</div>
-          <div class="help-text"><b>{{ summary.image_missing_cnt }}</b></div>
-        </div>
-        <div class="help-item">
-          <div class="help-title">Ortalama Skor</div>
-          <div class="help-text"><b>{{ summary.avg_score }}</b></div>
-        </div>
+      <div class="actions" style="margin-top:14px;">
+        <a class="btn btn-primary" href="/download/{{ token }}" style="text-decoration:none;">Düzeltilmiş Dosyayı İndir (CSV)</a>
+        <a class="btn" href="/" style="text-decoration:none;">Yeni Dosya Yükle</a>
       </div>
 
-      <h2>Detaylı Sonuçlar (İlk 200 Kayıt)</h2>
-      <p class="muted">
-        Aşağıdaki tablo analiz edilen verinin önizlemesini gösterir.
-        Tüm sonuçları Excel olarak indirebilirsiniz.
-      </p>
+      <div class="help">Not: Tablo ilk 50 satırı gösterir. İndirilen dosyada tüm satırlar bulunur.</div>
+    </div>
 
-      <div class="tablewrap">
+    <div class="card" style="margin-top:16px;">
+      <h2 class="card-title">Önizleme (İlk 50)</h2>
+      <div class="table-wrap">
         <table class="table">
           <thead>
             <tr>
               {% for c in columns %}
-                <th>{{ c }}</th>
+              <th>{{ c }}</th>
               {% endfor %}
             </tr>
           </thead>
           <tbody>
             {% for r in rows %}
-              <tr>
-                {% for c in columns %}
-                  <td>{{ r[c] }}</td>
-                {% endfor %}
-              </tr>
+            <tr>
+              {% for c in columns %}
+              <td>{{ r.get(c, "") }}</td>
+              {% endfor %}
+            </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
+    </div>
 
-    </main>
-
-    <footer class="footer">
-      <span>© Akıllı Katalog</span>
-    </footer>
-
+    <div class="footer">© Akıllı Katalog</div>
   </div>
 </body>
 </html>
+
