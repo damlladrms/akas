@@ -1,222 +1,352 @@
-from fastapi import FastAPI, Request, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
+from __future__ import annotations
 
-import pandas as pd
 import io
 import uuid
+from dataclasses import dataclass
+from typing import Dict, Optional, List, Tuple
+
+import pandas as pd
+from fastapi import FastAPI, Request, UploadFile, File, Form
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 
-app = FastAPI()
+# -----------------------------
+# Config
+# -----------------------------
+REQUIRED_FIELDS = {
+    "title": ["title", "product_title", "urun_adi", "ürün adı", "urunadi", "name", "product_name", "baslik", "başlık"],
+    "image_url": ["image_url", "img_url", "image", "imageurl", "gorsel", "görsel", "photo", "foto", "url"],
+    "category": ["category", "kategori", "cat", "kategori_adi", "category_name"],
+}
+
+# output columns
+OUT_COLS = [
+    "quality_score",
+    "issues",
+    "correction_notes",
+    "correct_title",
+    "correct_category",
+    "correct_image_url",
+]
+
+# In-memory store (demo için yeterli)
+@dataclass
+class AnalysisBundle:
+    df_original: pd.DataFrame
+    df_result: pd.DataFrame
+    mapping: Dict[str, str]  # internal_field -> column_name used
+
+
+STORE: Dict[str, AnalysisBundle] = {}
+
+
+# -----------------------------
+# App
+# -----------------------------
+app = FastAPI(title="AKAS - Akıllı Katalog Analiz Sistemi")
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-# Geçici bellek (Render restart olursa sıfırlanır)
-RAW_STORE: dict[str, pd.DataFrame] = {}      # kolon eşleştirme için ham veri
-RESULT_STORE: dict[str, pd.DataFrame] = {}   # analiz sonuçları
+
+# -----------------------------
+# Helpers
+# -----------------------------
+def _normalize(s: str) -> str:
+    return str(s).strip().lower()
 
 
-def read_uploaded_file(file: UploadFile, content: bytes) -> pd.DataFrame:
-    filename = (file.filename or "").lower().strip()
+def detect_mapping(columns: List[str]) -> Dict[str, Optional[str]]:
+    """
+    Try to match internal fields to existing columns using aliases.
+    Returns internal_field -> found_column or None
+    """
+    col_map = {c: _normalize(c) for c in columns}
+    found: Dict[str, Optional[str]] = {}
 
-    # Uzantı varsa ona göre oku
-    if filename.endswith(".csv"):
-        return pd.read_csv(io.BytesIO(content))
-    if filename.endswith(".xlsx"):
-        return pd.read_excel(io.BytesIO(content))
+    for internal, aliases in REQUIRED_FIELDS.items():
+        hit = None
+        for c, cn in col_map.items():
+            if cn == internal:
+                hit = c
+                break
+        if hit is None:
+            for alias in aliases:
+                alias_n = _normalize(alias)
+                for c, cn in col_map.items():
+                    if cn == alias_n:
+                        hit = c
+                        break
+                if hit is not None:
+                    break
+        found[internal] = hit
+    return found
 
-    # Uzantı yoksa: önce CSV dene, olmazsa Excel dene
-    try:
-        return pd.read_csv(io.BytesIO(content))
-    except Exception:
-        try:
-            return pd.read_excel(io.BytesIO(content))
-        except Exception:
-            raise ValueError("Sadece CSV veya Excel (.xlsx) dosyaları desteklenmektedir.")
+
+def read_uploaded_file(upload: UploadFile) -> pd.DataFrame:
+    name = (upload.filename or "").lower()
+    content = upload.file.read()
+
+    if name.endswith(".xlsx") or name.endswith(".xls"):
+        # Excel
+        return pd.read_excel(io.BytesIO(content), engine="openpyxl")
+
+    if name.endswith(".csv"):
+        # CSV (encoding fallback)
+        for enc in ("utf-8-sig", "utf-8", "cp1254", "latin1"):
+            try:
+                return pd.read_csv(io.BytesIO(content), encoding=enc)
+            except Exception:
+                continue
+        # last resort
+        return pd.read_csv(io.BytesIO(content), encoding="utf-8", errors="ignore")
+
+    raise ValueError("Desteklenmeyen dosya türü. Lütfen CSV veya Excel (.xlsx) yükleyin.")
 
 
-def run_analysis(df: pd.DataFrame) -> pd.DataFrame:
+def safe_str(x) -> str:
+    if pd.isna(x):
+        return ""
+    return str(x).strip()
+
+
+def analyze_row(title: str, image_url: str, category: str) -> Tuple[int, List[str], Dict[str, str]]:
+    """
+    Basit MVP analiz kuralları (demo için yeterli):
+    - Başlık zayıf: çok kısa / çok tekrar / anlamsız karakter
+    - Görsel eksik: boş veya 'http' içermiyor
+    - Kategori şüpheli: boş
+    Skor: 0-100
+    """
+    issues = []
+    corrections = {
+        "correct_title": title,
+        "correct_category": category,
+        "correct_image_url": image_url,
+    }
+
+    score = 100
+
+    t = title
+    c = category
+    img = image_url
+
+    # Title checks
+    if len(t) < 12:
+        issues.append("Zayıf başlık (çok kısa)")
+        score -= 18
+
+    if "??" in t or "!!!" in t or "..." in t:
+        issues.append("Zayıf başlık (şüpheli karakter)")
+        score -= 10
+
+    if t.count("  ") >= 1:
+        issues.append("Zayıf başlık (fazla boşluk)")
+        score -= 6
+        corrections["correct_title"] = " ".join(t.split())
+
+    # Image checks
+    if not img or ("http" not in img.lower() and "www" not in img.lower()):
+        issues.append("Görsel eksik / geçersiz URL")
+        score -= 30
+
+    # Category checks
+    if not c:
+        issues.append("Kategori boş / şüpheli")
+        score -= 22
+
+    score = max(0, min(100, score))
+    return score, issues, corrections
+
+
+def build_result_df(df: pd.DataFrame, mapping: Dict[str, str]) -> pd.DataFrame:
+    title_col = mapping["title"]
+    image_col = mapping["image_url"]
+    cat_col = mapping["category"]
+
     out = df.copy()
 
-    # --- 1) Yazım / şüpheli tekrar (Monttt, Maxxx gibi) ---
-    if "title" in out.columns:
-        title_series = out["title"].fillna("").astype(str)
+    quality_scores = []
+    issues_list = []
+    notes_list = []
+    correct_title = []
+    correct_category = []
+    correct_image_url = []
 
-        out["spelling_flag"] = title_series.str.contains(r"(.)\1\1", regex=True)
-        out["spelling_note"] = out["spelling_flag"].apply(lambda x: "Şüpheli tekrar" if x else "")
+    for _, row in out.iterrows():
+        title = safe_str(row.get(title_col, ""))
+        image_url = safe_str(row.get(image_col, "")) if image_col else ""
+        category = safe_str(row.get(cat_col, "")) if cat_col else ""
 
-        # ÖNERİ: 3+ tekrarları 2'ye indir (Monttt->Montt, Maxxx->Maxx)
-        out["title_suggestion"] = title_series.str.replace(r"(.)\1\1+", r"\1\1", regex=True)
-        out.loc[out["spelling_flag"] == False, "title_suggestion"] = ""
-    else:
-        out["spelling_flag"] = False
-        out["spelling_note"] = "title kolonu yok"
-        out["title_suggestion"] = ""
+        score, issues, corr = analyze_row(title, image_url, category)
 
-    # --- 2) Görsel eksikliği ---
-    if "image_url" in out.columns:
-        s = out["image_url"].fillna("").astype(str).str.strip()
-        out["image_missing"] = (s == "") | (s.str.lower().isin(["nan", "none"]))
-        out["image_note"] = out["image_missing"].apply(lambda x: "Görsel yok/boş" if x else "")
-    else:
-        out["image_missing"] = True
-        out["image_note"] = "image_url kolonu yok"
+        quality_scores.append(score)
+        issues_list.append("; ".join(issues) if issues else "Sorun yok")
+        # notes: only if correction applied
+        notes = []
+        if corr["correct_title"] != title:
+            notes.append("Başlık düzeltildi (boşluk temizleme)")
+        if ("Görsel eksik / geçersiz URL" in issues):
+            notes.append("Görsel URL kontrol edin")
+        if ("Kategori boş / şüpheli" in issues):
+            notes.append("Kategori alanını doldurun")
+        notes_list.append("; ".join(notes) if notes else "")
 
-    out["image_suggestion"] = out["image_missing"].apply(
-        lambda x: "Ürüne ait net bir görsel eklenmeli" if x else ""
-    )
+        correct_title.append(corr["correct_title"])
+        correct_category.append(corr["correct_category"])
+        correct_image_url.append(corr["correct_image_url"])
 
-    # --- 3) Kalite skoru (MVP) ---
-    out["quality_score"] = 90
-    out.loc[out["spelling_flag"] == True, "quality_score"] -= 10
-    out.loc[out["image_missing"] == True, "quality_score"] -= 20
-    out["quality_score"] = out["quality_score"].clip(lower=0, upper=100)
+    out["quality_score"] = quality_scores
+    out["issues"] = issues_list
+    out["correction_notes"] = notes_list
+    out["correct_title"] = correct_title
+    out["correct_category"] = correct_category
+    out["correct_image_url"] = correct_image_url
 
+    # make sure these columns are at the end (nice view)
+    # (keep original columns first)
+    for col in OUT_COLS:
+        if col not in out.columns:
+            out[col] = ""
     return out
 
 
-def build_summary(out_df: pd.DataFrame) -> dict:
-    # güvenli çekimler
-    spelling_cnt = int(out_df["spelling_flag"].sum()) if "spelling_flag" in out_df.columns else 0
-    image_missing_cnt = int(out_df["image_missing"].sum()) if "image_missing" in out_df.columns else 0
-    avg_score = float(out_df["quality_score"].mean()) if "quality_score" in out_df.columns else 0.0
-
+def summary_metrics(df_result: pd.DataFrame) -> Dict[str, int]:
+    # suspicious title: contains "Zayıf başlık"
+    suspicious_titles = int(df_result["issues"].str.contains("Zayıf başlık", na=False).sum())
+    missing_images = int(df_result["issues"].str.contains("Görsel eksik", na=False).sum())
+    avg_score = int(round(float(df_result["quality_score"].mean()))) if len(df_result) else 0
+    total = int(len(df_result))
     return {
-        "row_count": int(len(out_df)),
-        "spelling_cnt": spelling_cnt,
-        "image_missing_cnt": image_missing_cnt,
-        "avg_score": round(avg_score, 1),
+        "total": total,
+        "suspicious_titles": suspicious_titles,
+        "missing_images": missing_images,
+        "avg_score": avg_score,
     }
 
 
-def apply_mapping(df: pd.DataFrame, title_col: str, image_col: str, category_col: str | None, sub_category_col: str | None) -> pd.DataFrame:
-    mapped = df.copy()
-
-    rename_map = {}
-
-    if title_col and title_col != "__none__":
-        rename_map[title_col] = "title"
-    if image_col and image_col != "__none__":
-        rename_map[image_col] = "image_url"
-    if category_col and category_col != "__none__":
-        rename_map[category_col] = "category"
-    if sub_category_col and sub_category_col != "__none__":
-        rename_map[sub_category_col] = "sub_category"
-
-    mapped = mapped.rename(columns=rename_map)
-
-    # Eksik zorunlu kolonlar varsa bile analiz çalışsın diye garanti kolon açalım
-    if "title" not in mapped.columns:
-        mapped["title"] = ""
-    if "image_url" not in mapped.columns:
-        mapped["image_url"] = ""
-
-    return mapped
+def df_to_csv_bytes(df: pd.DataFrame) -> bytes:
+    buf = io.StringIO()
+    df.to_csv(buf, index=False, encoding="utf-8-sig")
+    return buf.getvalue().encode("utf-8-sig")
 
 
+# -----------------------------
+# Routes
+# -----------------------------
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request):
+def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+from fastapi.responses import RedirectResponse
+
+@app.get("/analyze")
+def analyze_get():
+    return RedirectResponse(url="/", status_code=302)
 
 
-@app.post("/upload", response_class=HTMLResponse)
-async def upload(request: Request, file: UploadFile = File(...)):
-    content = await file.read()
-
+@app.post("/analyze", response_class=HTMLResponse)
+async def analyze(request: Request, file: UploadFile = File(...)):
     try:
-        df = read_uploaded_file(file, content)
-    except ValueError as ve:
-        return HTMLResponse(str(ve), status_code=400)
+        df = read_uploaded_file(file)
     except Exception as e:
-        return HTMLResponse(f"Dosya okunamadı: {e}", status_code=400)
-
-    # Eğer standart kolonlar zaten varsa direkt analiz et
-    cols = set([c.strip() for c in df.columns.astype(str)])
-    has_title = "title" in cols
-    has_image = "image_url" in cols
-
-    if has_title and has_image:
-        out_df = run_analysis(df)
-        job_id = str(uuid.uuid4())
-        RESULT_STORE[job_id] = out_df
-
-        summary = build_summary(out_df)
-        preview = out_df.head(200).to_dict(orient="records")
-        columns = list(out_df.columns)
-
         return templates.TemplateResponse(
-            "results.html",
-            {"request": request, "job_id": job_id, "columns": columns, "rows": preview, "summary": summary},
+            "index.html",
+            {"request": request, "error": f"Dosya okunamadı: {e}"},
+            status_code=400,
         )
 
-    # Yoksa kolon eşleştirme ekranına gönder
-    upload_id = str(uuid.uuid4())
-    RAW_STORE[upload_id] = df
+    # Detect mapping
+    detected = detect_mapping(list(df.columns))
+    missing = [k for k, v in detected.items() if v is None]
 
-    all_columns = [str(c) for c in df.columns.tolist()]
-    # dropdown için ayrıca bir "seçmedim" opsiyonu
-    options = ["__none__"] + all_columns
+    # If missing required columns -> go mapping screen
+    if missing:
+        # store original df temporarily with a token
+        token = str(uuid.uuid4())
+        # create placeholder mapping (None allowed here, but we’ll finalize after user selection)
+        STORE[token] = AnalysisBundle(df_original=df, df_result=df, mapping={})
+        return templates.TemplateResponse(
+            "map_columns.html",
+            {
+                "request": request,
+                "token": token,
+                "columns": list(df.columns),
+                "detected": detected,
+                "missing": missing,
+            },
+        )
+
+    # Build result
+    token = str(uuid.uuid4())
+    mapping = {"title": detected["title"], "image_url": detected["image_url"], "category": detected["category"]}
+    df_result = build_result_df(df, mapping)
+    STORE[token] = AnalysisBundle(df_original=df, df_result=df_result, mapping=mapping)
+
+    metrics = summary_metrics(df_result)
+    preview = df_result.head(50).to_dict(orient="records")
 
     return templates.TemplateResponse(
-        "map_columns.html",
+        "results.html",
         {
             "request": request,
-            "upload_id": upload_id,
-            "options": options,
-            "all_columns": all_columns,
+            "token": token,
+            "metrics": metrics,
+            "columns": list(df_result.columns),
+            "rows": preview,
         },
     )
 
 
-@app.post("/analyze_mapped", response_class=HTMLResponse)
-async def analyze_mapped(
+@app.post("/map-columns", response_class=HTMLResponse)
+async def map_columns(
     request: Request,
-    upload_id: str = Form(...),
-    title_col: str = Form("__none__"),
-    image_col: str = Form("__none__"),
-    category_col: str = Form("__none__"),
-    sub_category_col: str = Form("__none__"),
+    token: str = Form(...),
+    map_title: str = Form(...),
+    map_image_url: str = Form(""),
+    map_category: str = Form(...),
 ):
-    if upload_id not in RAW_STORE:
-        return HTMLResponse("Yükleme bulunamadı. Lütfen yeniden dosya yükleyin.", status_code=404)
+    if token not in STORE:
+        return RedirectResponse(url="/", status_code=303)
 
-    df = RAW_STORE[upload_id]
+    bundle = STORE[token]
+    df = bundle.df_original
 
-    # eşleştir -> analiz
-    mapped_df = apply_mapping(df, title_col, image_col, category_col, sub_category_col)
-    out_df = run_analysis(mapped_df)
+    mapping = {
+        "title": map_title,
+        "image_url": map_image_url.strip() if map_image_url else "",
+        "category": map_category,
+    }
 
-    job_id = str(uuid.uuid4())
-    RESULT_STORE[job_id] = out_df
+    df_result = build_result_df(df, mapping)
+    new_token = str(uuid.uuid4())
+    STORE[new_token] = AnalysisBundle(df_original=df, df_result=df_result, mapping=mapping)
 
-    summary = build_summary(out_df)
-    preview = out_df.head(200).to_dict(orient="records")
-    columns = list(out_df.columns)
+    metrics = summary_metrics(df_result)
+    preview = df_result.head(50).to_dict(orient="records")
 
     return templates.TemplateResponse(
         "results.html",
-        {"request": request, "job_id": job_id, "columns": columns, "rows": preview, "summary": summary},
+        {
+            "request": request,
+            "token": new_token,
+            "metrics": metrics,
+            "columns": list(df_result.columns),
+            "rows": preview,
+        },
     )
 
 
-@app.get("/download/{job_id}")
-def download(job_id: str):
-    if job_id not in RESULT_STORE:
-        return HTMLResponse("Bulunamadı", status_code=404)
-
-    df = RESULT_STORE[job_id]
-
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="results")
-    output.seek(0)
-
-    headers = {"Content-Disposition": 'attachment; filename="akilli_katalog_sonuc.xlsx"'}
+@app.get("/download/{token}")
+def download(token: str):
+    if token not in STORE:
+        return RedirectResponse(url="/", status_code=303)
+    df = STORE[token].df_result
+    data = df_to_csv_bytes(df)
     return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers=headers,
+        io.BytesIO(data),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="akas_sonuclar_{token[:8]}.csv"'},
     )
 
