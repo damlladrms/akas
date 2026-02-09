@@ -1,57 +1,56 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Akıllı Katalog Analiz Sistemi</title>
-  <link rel="stylesheet" href="/static/style.css?v=101" />
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="container">
-    <div class="topbar">
-      <div class="brand-badge">AKAS</div>
-      <div class="hgroup">
+  <div class="bg"></div>
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo">AKAS</div>
+      <div class="brandtext">
         <h1>Akıllı Katalog Analiz Sistemi</h1>
-        <p>Ürün ve içerik verilerini otomatik analiz ederek hatalı kategori, zayıf başlık, alakasız görsel ve düşük kalite skorlarını tespit eder.</p>
+        <p class="subtitle">
+          Ürün ve içerik verilerini otomatik analiz ederek hatalı kategori, zayıf başlık, alakasız görsel ve düşük kalite skorlarını tespit eder.
+        </p>
       </div>
     </div>
+  </header>
 
-    <div class="card">
-      <h2 class="card-title">Dosya Yükle</h2>
-      <p class="card-desc">CSV veya Excel (.xlsx) yükleyin. Kolon adları farklıysa sistem sizi “Kolon Eşleştir” ekranına yönlendirir.</p>
+  <main class="container">
+    <section class="card">
+      <h2>Dosya Yükle</h2>
+      <p class="muted">CSV veya Excel (.xlsx/.xls) dosyanızı yükleyin. Kolon adları farklıysa sistem sizi “Kolon Eşleştir” ekranına yönlendirir.</p>
 
       {% if error %}
-      <div class="alert alert-error">{{ error }}</div>
+        <div class="alert">{{ error }}</div>
       {% endif %}
 
-      <form action="/analyze" method="post" enctype="multipart/form-data">
-        <div class="upload-panel">
-          <div class="file-left">
-            <input class="file-input" id="file" type="file" name="file" accept=".csv,.xlsx,.xls" required />
-            <label class="file-btn" for="file">Dosya Seç</label>
-            <span class="file-name" id="fileName">Henüz dosya seçilmedi</span>
-          </div>
-        </div>
-
-        <div class="actions">
-          <button class="btn btn-primary" type="submit">Analizi Başlat</button>
-        </div>
-
-        <div class="help">Desteklenen formatlar: CSV, Excel (.xlsx). Sonuçlarda “Düzeltilmiş Dosyayı İndir” ile çıktıyı alabilirsiniz.</div>
+      <form class="upload" action="/analyze" method="post" enctype="multipart/form-data">
+        <label class="filebox">
+          <input type="file" name="file" accept=".csv,.xlsx,.xls" required>
+          <span>Dosya Seç</span>
+        </label>
+        <button type="submit" class="btn primary">Analizi Başlat</button>
       </form>
-    </div>
 
-    <div class="footer">© Akıllı Katalog</div>
-  </div>
+      <div class="grid2">
+        <div class="mini">
+          <div class="mini-title">Desteklenen Formatlar</div>
+          <div class="mini-text">CSV, Excel (.xlsx/.xls)</div>
+        </div>
+        <div class="mini">
+          <div class="mini-title">Amaç</div>
+          <div class="mini-text">E-ticaret katalog kalitesini artırmak ve manuel kontrol yükünü azaltmak.</div>
+        </div>
+      </div>
+    </section>
 
-  <script>
-    const fileInput = document.getElementById("file");
-    const fileName = document.getElementById("fileName");
-    if (fileInput && fileName){
-      fileInput.addEventListener("change", () => {
-        fileName.textContent = fileInput.files?.[0]?.name || "Henüz dosya seçilmedi";
-      });
-    }
-  </script>
+    <footer class="footer">© Akıllı Katalog</footer>
+  </main>
 </body>
 </html>

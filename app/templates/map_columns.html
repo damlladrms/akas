@@ -1,53 +1,49 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Kolon Eşleştir - AKAS</title>
-  <link rel="stylesheet" href="/static/style.css?v=101" />
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="container">
-    <div class="topbar">
-      <div class="brand-badge">AKAS</div>
-      <div class="hgroup">
+  <div class="bg"></div>
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo">AKAS</div>
+      <div class="brandtext">
         <h1>Kolon Eşleştir</h1>
-        <p>Dosyanızdaki kolon adları beklenen formatla eşleşmedi. Lütfen alanları eşleştirin.</p>
+        <p class="subtitle">Dosyanızdaki kolonları sistemin beklediği alanlarla eşleştirin.</p>
       </div>
     </div>
+    <a class="btn ghost" href="/">Geri</a>
+  </header>
 
-    <div class="card">
-      <h2 class="card-title">Eşleştirme</h2>
-      <p class="card-desc">Zorunlu: Başlık ve Kategori. Görsel URL opsiyonel.</p>
+  <main class="container">
+    <section class="card">
+      {% if error %}
+        <div class="alert">{{ error }}</div>
+      {% endif %}
 
-      <form action="/run" method="post">
-        <input type="hidden" name="token" value="{{ token }}" />
+      <form action="/analyze-mapped" method="post" class="mapping">
+        <input type="hidden" name="token" value="{{ token }}"/>
 
-        <div class="map-grid">
-          <div class="map-item">
-            <label class="map-label">Başlık (Zorunlu)</label>
-            <select class="map-select" name="title_column" required>
-              <option value="" disabled selected>Seçiniz</option>
+        <div class="row">
+          <div>
+            <label>Başlık kolonu (title)</label>
+            <select name="title_col">
+              <option value="">Seçmeden devam edebilirsiniz</option>
               {% for c in columns %}
                 <option value="{{ c }}" {% if detected.title == c %}selected{% endif %}>{{ c }}</option>
               {% endfor %}
             </select>
           </div>
 
-          <div class="map-item">
-            <label class="map-label">Kategori (Zorunlu)</label>
-            <select class="map-select" name="category_column" required>
-              <option value="" disabled selected>Seçiniz</option>
-              {% for c in columns %}
-                <option value="{{ c }}" {% if detected.category == c %}selected{% endif %}>{{ c }}</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div class="map-item">
-            <label class="map-label">Görsel URL (Opsiyonel)</label>
-            <select class="map-select" name="image_column">
-              <option value="">Yok / Kullanma</option>
+          <div>
+            <label>Görsel URL/Path kolonu (image_url)</label>
+            <select name="image_col">
+              <option value="">Seçmeden devam edebilirsiniz</option>
               {% for c in columns %}
                 <option value="{{ c }}" {% if detected.image_url == c %}selected{% endif %}>{{ c }}</option>
               {% endfor %}
@@ -55,14 +51,42 @@
           </div>
         </div>
 
-        <div class="actions" style="margin-top:16px;">
-          <button class="btn btn-primary" type="submit">Analize Devam Et</button>
-          <a class="btn" href="/" style="text-decoration:none; text-align:center;">Geri</a>
-        </div>
-      </form>
-    </div>
+        <div class="row">
+          <div>
+            <label>Kategori kolonu (category) — opsiyonel</label>
+            <select name="category_col">
+              <option value="">Seçmeden devam edebilirsiniz</option>
+              {% for c in columns %}
+                <option value="{{ c }}" {% if detected.category == c %}selected{% endif %}>{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
 
-    <div class="footer">© Akıllı Katalog</div>
-  </div>
+          <div>
+            <label>Alt kategori kolonu (sub_category) — opsiyonel</label>
+            <select name="sub_category_col">
+              <option value="">Seçmeden devam edebilirsiniz</option>
+              {% for c in columns %}
+                <option value="{{ c }}" {% if detected.sub_category == c %}selected{% endif %}>{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="hint">
+          İpucu: Başlık ve görsel eşleştirirsen skor ve öneriler daha anlamlı olur.
+        </div>
+
+        <button type="submit" class="btn primary">Analizi Başlat</button>
+      </form>
+
+      <div class="smallnote">
+        <strong>Dosyadaki kolonlar:</strong><br/>
+        {{ columns|join(", ") }}
+      </div>
+    </section>
+
+    <footer class="footer">© Akıllı Katalog</footer>
+  </main>
 </body>
 </html>
